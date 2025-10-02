@@ -7,6 +7,6 @@
         mc:Ignorable="d"
         Title="RtsaWindow" Height="450" Width="800">
     <Grid>
-        <Canvas x:Name="SpectrumCanvas" Background="Black"/>
+        <Canvas x:Name="SpectrumCanvas" Background="Black" />
     </Grid>
 </Window>

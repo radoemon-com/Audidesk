@@ -4,6 +4,7 @@ using System.Windows.Media;
 using System.Windows.Shapes;
 using NAudio.Wave;
 using NAudio.Dsp;
+using System.Windows.Controls;
 
 namespace Audidesk
 {
@@ -13,17 +14,20 @@ namespace Audidesk
         private const int fftLength = 1024;
         private Complex[] fftBuffer = new Complex[fftLength];
         private int bufferOffset = 0;
-        private int drawPoints = 980;
+        private int barsCount = 80;
 
         private double[] previousDbValues;
+        private const int sampleRate = 44100;
+        private const double freqStart = 80.0;
+        private const double freqEnd = 6000.0;
 
         public RtsaWindow()
         {
             InitializeComponent();
             Loaded += RtsaWindow_Loaded;
 
-            previousDbValues = new double[drawPoints];
-            for (int i = 0; i < drawPoints; i++) previousDbValues[i] = -80; // 最低レベルで初期化
+            previousDbValues = new double[barsCount];
+            for (int i = 0; i < barsCount; i++) previousDbValues[i] = -60;
         }
 
         private void RtsaWindow_Loaded(object sender, RoutedEventArgs e)
@@ -40,7 +44,7 @@ namespace Audidesk
 
         private void OnDataAvailable(object? sender, WaveInEventArgs e)
         {
-            int bytesPerSample = 4; // 32-bit float
+            int bytesPerSample = 4;
 
             for (int i = bufferOffset; i < fftLength; i++)
             {
@@ -74,7 +78,8 @@ namespace Audidesk
             double height = SpectrumCanvas.ActualHeight;
             if (width == 0 || height == 0) return;
 
-            // 背景グラデーション
+            double centerY = height / 2;
+
             SpectrumCanvas.Background = new LinearGradientBrush(
                 new GradientStopCollection
                 {
@@ -82,82 +87,52 @@ namespace Audidesk
                     new GradientStop(Color.FromRgb(40, 40, 70), 1.0),
                 }, new Point(0, 0), new Point(0, 1));
 
-            var polyline = new Polyline
+            double barWidth = width / barsCount * 0.8;
+            double barSpacing = width / barsCount * 0.2;
+
+            double smoothing = 0.05;
+
+            for (int i = 0; i < barsCount; i++)
             {
-                StrokeThickness = 3,
-                StrokeLineJoin = PenLineJoin.Round,
-                SnapsToDevicePixels = true,
-                Effect = new System.Windows.Media.Effects.DropShadowEffect
-                {
-                    Color = Colors.Cyan,
-                    BlurRadius = 8,
-                    ShadowDepth = 0,
-                    Opacity = 0.7
-                }
-            };
-
-            var gradientBrush = new LinearGradientBrush
-            {
-                StartPoint = new Point(0, 0),
-                EndPoint = new Point(1, 0),
-                GradientStops = new GradientStopCollection
-                {
-                    new GradientStop(Colors.Magenta, 0.0),
-                    new GradientStop(Colors.Cyan, 0.5),
-                    new GradientStop(Colors.Lime, 1.0),
-                }
-            };
-
-            polyline.Stroke = gradientBrush;
-
-            double smoothing = 0.17;
-
-            // 「よく動く」帯域をここで指定（ビン番号）
-            int centerStart = 400; // 中央に表示したい帯域の開始ビン（例）
-            int centerEnd = 600;   // 中央に表示したい帯域の終了ビン（例）
-            int centerRange = centerEnd - centerStart;
-
-            for (int i = 0; i < drawPoints; i++)
-            {
-                double normPos = (double)i / (drawPoints - 1);
-                int bin;
-
-                if (normPos < 0.45)
-                {
-                    // 左端: 低周波数帯域(0〜centerStartの45%)
-                    double leftNorm = normPos / 0.45; // 0~1
-                    bin = (int)(leftNorm * centerStart);
-                }
-                else if (normPos < 0.55)
-                {
-                    // 中央: よく動く帯域(centerStart〜centerEnd)
-                    double centerNorm = (normPos - 0.45) / 0.10; // 0~1
-                    bin = centerStart + (int)(centerRange * centerNorm);
-                }
-                else
-                {
-                    // 右端: 高周波数帯域(centerEnd〜fftLength/2)
-                    double rightNorm = (normPos - 0.55) / 0.45; // 0~1
-                    bin = centerEnd + (int)((fftLength / 2 - centerEnd) * rightNorm);
-                }
-
+                double freq = freqStart + (freqEnd - freqStart) * i / (barsCount - 1);
+                int bin = (int)(freq / sampleRate * fftLength);
                 bin = Math.Clamp(bin, 0, fftLength / 2 - 1);
 
                 double magnitude = Math.Sqrt(fftBuffer[bin].X * fftBuffer[bin].X + fftBuffer[bin].Y * fftBuffer[bin].Y);
                 magnitude = Math.Max(magnitude, 1e-10);
 
                 double db = 20 * Math.Log10(magnitude);
-                db = Math.Clamp(db, -80, 0);
+                db = Math.Clamp(db, -60, 0);
 
-                db = previousDbValues[i] = previousDbValues[i] * (1 - smoothing) + db * smoothing;
+                // スムージング
+                previousDbValues[i] = previousDbValues[i] * (1 - smoothing) + db * smoothing;
 
-                double x = normPos * width;
-                double y = height - ((db + 80) / 80.0) * height;
+                // 正規化（0.0 ～ 1.0）
+                double normalized = (previousDbValues[i] + 60) / 60.0;
 
-                polyline.Points.Add(new Point(x, y));
+                // 棒の高さ（上下対称）
+                double barHeight = normalized * (height / 2) * 1.2;
+                barHeight = Math.Min(barHeight, height / 2);
+
+                var rect = new Rectangle
+                {
+                    Width = barWidth,
+                    Height = barHeight * 2, // 上下に伸ばすため2倍
+                    Fill = new LinearGradientBrush(
+                        Colors.Cyan,
+                        Colors.Magenta,
+                        new Point(0, 1),
+                        new Point(0, 0)),
+                    RadiusX = barWidth / 4,
+                    RadiusY = barWidth / 4,
+                };
+
+                // 棒の配置（中央から上下に出る）
+                Canvas.SetLeft(rect, i * (barWidth + barSpacing));
+                Canvas.SetTop(rect, centerY - barHeight);
+
+                SpectrumCanvas.Children.Add(rect);
             }
-
-            SpectrumCanvas.Children.Add(polyline);
         }
 
         protected override void OnClosed(EventArgs e)
