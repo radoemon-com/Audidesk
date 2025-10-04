@@ -13,8 +13,11 @@ namespace Audidesk
         private AudioFileReader? audioFile;
         private string[] mp3Files = Array.Empty<string>();
         private int currentTrackIndex = 0;
+        private List<int> playedIndices = new List<int>();
 
         private bool isShuffling = false;
+        private bool isRepeating = false;
+        private bool isRepeatingSingle = false;
         private Random random = new Random();
 
         public PlayerWindow()
@@ -74,17 +77,47 @@ namespace Audidesk
         {
             Dispatcher.Invoke(() =>
             {
+                if (isRepeatingSingle)
+                {
+                    PlayAudio(mp3Files[currentTrackIndex]);
+                    return;
+                }
+
                 if (isShuffling)
                 {
-                    // シャッフルモードならランダムに次を選ぶ（現在と違うものを選びたいなら工夫可能）
-                    currentTrackIndex = random.Next(mp3Files.Length);
+                    if (playedIndices.Count >= mp3Files.Length)
+                    {
+                        playedIndices.Clear(); // 全曲再生済みならリセット
+                    }
+
+                    var remainingIndices = Enumerable.Range(0, mp3Files.Length)
+                        .Where(i => !playedIndices.Contains(i))
+                        .ToList();
+
+                    if (remainingIndices.Count == 0)
+                        return;
+
+                    int randomIndex = random.Next(remainingIndices.Count);
+                    currentTrackIndex = remainingIndices[randomIndex];
+                    playedIndices.Add(currentTrackIndex);
                 }
                 else
                 {
-                    // 通常の順番再生
-                    currentTrackIndex++;
-                    if (currentTrackIndex >= mp3Files.Length)
-                        currentTrackIndex = 0; // ループ再生（止めたいなら return してもOK）
+                    if (isRepeating)
+                    {
+                        currentTrackIndex++;
+                        if (currentTrackIndex >= mp3Files.Length)
+                            currentTrackIndex = 0; // ループ再生（止めたいなら return してもOK）        
+                    }
+                    else
+                    {
+                        currentTrackIndex++;
+                        if (currentTrackIndex >= mp3Files.Length)
+                        {
+                            // StopAudio();
+                            return; // 再生終了
+                        }
+                    }
                 }
 
                 MusicListBox.SelectedIndex = currentTrackIndex;
@@ -119,9 +152,31 @@ namespace Audidesk
             MessageBox.Show($"シャッフル: {(isShuffling ? "ON" : "OFF")}");
         }
 
+        private void ToggleRepeat()
+        {
+            isRepeating = !isRepeating;
+            MessageBox.Show($"リピート: {(isRepeating ? "ON" : "OFF")}");
+        }
+
+        private void ToggleRepeatSingle()
+        {
+            isRepeatingSingle = !isRepeatingSingle;
+            MessageBox.Show($"シングルリピート: {(isRepeatingSingle ? "ON" : "OFF")}");
+        }
+
         private void ShuffleButton_Click(object sender, RoutedEventArgs e)
         {
             ToggleShuffle();
+        }
+
+        private void RepeatButton_Click(object sender, RoutedEventArgs e)
+        {
+            ToggleRepeat();
+        }
+
+        private void RepeatSingleButton_Click(object sender, RoutedEventArgs e)
+        {
+            ToggleRepeatSingle();
         }
     }
 }

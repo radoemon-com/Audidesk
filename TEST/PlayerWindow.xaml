@@ -12,7 +12,9 @@
             <RowDefinition Height="*"/>
         </Grid.RowDefinitions>
 
-        <Button Content="シャッフル切り替え" Click="ShuffleButton_Click" Margin="10"/>
+        <Button Content="シャッフル切り替え" Click="ShuffleButton_Click" Margin="10,10,505,10"/>
+        <Button Content="リピート切り替え" Click="RepeatButton_Click" Margin="556,10,10,10"/>
+        <Button Content="リピート" Click="RepeatSingleButton_Click" Margin="300,10,244,10"/>
         
         <ListBox x:Name="MusicListBox"
                  Grid.Row="1"
