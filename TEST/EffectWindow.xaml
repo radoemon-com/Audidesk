@@ -5,21 +5,50 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:Audidesk"
         mc:Ignorable="d"
-        Title="EffectWindow" Height="450" Width="800">
+        Title="EffectWindow" Height="600" Width="800">
+
     <Grid>
         <StackPanel Margin="20" VerticalAlignment="Center">
             <Button Content="Select and Play" Click="SelectAndPlayButton_Click" Margin="0,0,0,10"/>
 
+            <!-- Echo -->
             <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
                 <Button Content="Toggle Echo" Click="ToggleEchoButton_Click" Width="100"/>
-                <Slider x:Name="EchoSlider" Minimum="0" Maximum="1" Value="0.5" Width="300" Margin="10,0,0,0"
+                <Slider x:Name="EchoSlider" Minimum="0" Maximum="1" Value="0.5" Width="300" 
+                        IsDirectionReversed="True" Margin="10,0,0,0"
                         ValueChanged="EchoSlider_ValueChanged"/>
             </StackPanel>
 
-            <StackPanel Orientation="Horizontal">
+            <!-- Reverb -->
+            <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
                 <Button Content="Toggle Reverb" Click="ToggleReverbButton_Click" Width="100"/>
-                <Slider x:Name="ReverbSlider" Minimum="0" Maximum="1" Value="0.5" Width="300" Margin="10,0,0,0"
+                <Slider x:Name="ReverbSlider" Minimum="0" Maximum="1" Value="0.5" Width="300"
+                        IsDirectionReversed="True" Margin="10,0,0,0"
                         ValueChanged="ReverbSlider_ValueChanged"/>
+            </StackPanel>
+
+            <!-- Tremolo -->
+            <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
+                <Button Content="Toggle Tremolo" Click="ToggleTremoloButton_Click" Width="100"/>
+                <Slider x:Name="TremoloDepthSlider" Minimum="0" Maximum="1" Value="0.7" Width="300"
+                        IsDirectionReversed="True" Margin="10,0,0,0"
+                        ValueChanged="TremoloDepthSlider_ValueChanged"/>
+            </StackPanel>
+
+            <!-- Chorus -->
+            <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
+                <Button Content="Toggle Chorus" Click="ToggleChorusButton_Click" Width="100"/>
+                <Slider x:Name="ChorusSlider" Minimum="0" Maximum="1" Value="0.5" Width="300"
+                        IsDirectionReversed="True" Margin="10,0,0,0"
+                        ValueChanged="ChorusSlider_ValueChanged"/>
+            </StackPanel>
+
+            <!-- Compressor -->
+            <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
+                <Button Content="Toggle Compressor" Click="ToggleCompressorButton_Click" Width="100"/>
+                <Slider x:Name="CompressorSlider" Minimum="0" Maximum="1" Value="0.5" Width="300"
+                        IsDirectionReversed="True" Margin="10,0,0,0"
+                        ValueChanged="CompressorSlider_ValueChanged"/>
             </StackPanel>
         </StackPanel>
     </Grid>

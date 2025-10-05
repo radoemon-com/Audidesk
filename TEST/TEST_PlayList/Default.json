@@ -1,0 +1,16 @@
+{
+    "playListDefault": {
+        "name": "デフォルト",
+        "music": {
+            "0": {
+                "filePath": "TEST/Music/DENONBU - PLAY,PAUSE.mp3",
+                "title": "DENONBU - PLAY,PAUSE"
+            },
+
+            "1": {
+                "filePath": "TEST/Music/KizunaAI「かもね」.mp3",
+                "title": "KizunaAI「かもね」"
+            }
+        }
+    }
+}

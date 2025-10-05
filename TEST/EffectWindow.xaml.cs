@@ -1,8 +1,9 @@
 using System;
+using System.Collections.Generic;
+using System.Linq;
 using System.Windows;
 using Microsoft.Win32;
 using NAudio.Wave;
-using NAudio.Wave.SampleProviders;
 
 namespace Audidesk
 {
@@ -11,14 +12,21 @@ namespace Audidesk
         private IWavePlayer? outputDevice;
         private AudioFileReader? audioFile;
 
-        private SimpleEchoProvider? echoProvider;
-        private SimpleReverbProvider? reverbProvider;
-
-        private ISampleProvider? currentProvider;
         private ISampleProvider? baseProvider;
+        private ISampleProvider? currentProvider;
+
+        // 各エフェクトを保持
+        private MultiTapEchoProvider? echo;
+        private HighQualityReverbProvider? reverb;
+        private HighQualityTremoloProvider? tremolo;
+        private SimpleChorusProvider? chorus;
+        private SimpleCompressorProvider? compressor;
 
         private bool isEchoEnabled = false;
         private bool isReverbEnabled = false;
+        private bool isTremoloEnabled = false;
+        private bool isChorusEnabled = false;
+        private bool isCompressorEnabled = false;
 
         public EffectWindow()
         {
@@ -45,189 +53,282 @@ namespace Audidesk
             audioFile = new AudioFileReader(path);
             baseProvider = audioFile;
 
-            UpdateEffectChain();
+            BuildInitialChain();
 
-            outputDevice = new WaveOutEvent();
+            outputDevice = new WaveOutEvent() { DesiredLatency = 150 };
             outputDevice.Init(currentProvider);
             outputDevice.Play();
         }
 
         private void StopAudio()
         {
-            if (outputDevice != null)
-            {
-                outputDevice.Stop();
-                outputDevice.Dispose();
-                outputDevice = null;
-            }
+            outputDevice?.Stop();
+            outputDevice?.Dispose();
+            outputDevice = null;
 
             audioFile?.Dispose();
             audioFile = null;
-            echoProvider = null;
-            reverbProvider = null;
-            baseProvider = null;
-            currentProvider = null;
         }
 
-        private void UpdateEffectChain()
+        private void BuildInitialChain()
         {
-            ISampleProvider provider = baseProvider!;
+            if (baseProvider == null) return;
 
-            if (isEchoEnabled)
-            {
-                echoProvider = new SimpleEchoProvider(provider, TimeSpan.FromMilliseconds(300), (float)EchoSlider.Value);
-                provider = echoProvider;
-            }
-            else
-            {
-                echoProvider = null;
-            }
+            ISampleProvider provider = baseProvider;
 
-            if (isReverbEnabled)
-            {
-                reverbProvider = new SimpleReverbProvider(provider, TimeSpan.FromMilliseconds(300), (float)ReverbSlider.Value);
-                provider = reverbProvider;
-            }
-            else
-            {
-                reverbProvider = null;
-            }
+            echo = new MultiTapEchoProvider(provider);
+            reverb = new HighQualityReverbProvider(echo);
+            tremolo = new HighQualityTremoloProvider(reverb);
+            chorus = new SimpleChorusProvider(tremolo);
+            compressor = new SimpleCompressorProvider(chorus);
 
-            currentProvider = provider;
-
-            if (outputDevice != null && outputDevice.PlaybackState == PlaybackState.Playing)
-            {
-                outputDevice.Stop();
-                outputDevice.Init(currentProvider);
-                outputDevice.Play();
-            }
+            currentProvider = compressor;
         }
 
-        private void ToggleEchoButton_Click(object sender, RoutedEventArgs e)
+        private void RefreshEffectParameters()
         {
-            isEchoEnabled = !isEchoEnabled;
-            UpdateEffectChain();
-            MessageBox.Show($"Echo {(isEchoEnabled ? "ON" : "OFF")}");
+            if (baseProvider == null) return;
+
+            float echoLevel = (float)(1.0 - EchoSlider.Value);
+            float reverbLevel = (float)(1.0 - ReverbSlider.Value);
+            float tremoloLevel = (float)(1.0 - TremoloDepthSlider.Value);
+            float chorusLevel = (float)(1.0 - ChorusSlider.Value);
+            float compressorLevel = (float)(1.0 - CompressorSlider.Value);
+
+            echo?.UpdateParameters(isEchoEnabled, echoLevel);
+            reverb?.UpdateParameters(isReverbEnabled, reverbLevel);
+            tremolo?.UpdateParameters(isTremoloEnabled, tremoloLevel);
+            chorus?.UpdateParameters(isChorusEnabled, chorusLevel);
+            compressor?.UpdateParameters(isCompressorEnabled, compressorLevel);
         }
 
-        private void ToggleReverbButton_Click(object sender, RoutedEventArgs e)
-        {
-            isReverbEnabled = !isReverbEnabled;
-            UpdateEffectChain();
-            MessageBox.Show($"Reverb {(isReverbEnabled ? "ON" : "OFF")}");
-        }
+        // トグルボタン
+        private void ToggleEchoButton_Click(object sender, RoutedEventArgs e) { isEchoEnabled = !isEchoEnabled; RefreshEffectParameters(); }
+        private void ToggleReverbButton_Click(object sender, RoutedEventArgs e) { isReverbEnabled = !isReverbEnabled; RefreshEffectParameters(); }
+        private void ToggleTremoloButton_Click(object sender, RoutedEventArgs e) { isTremoloEnabled = !isTremoloEnabled; RefreshEffectParameters(); }
+        private void ToggleChorusButton_Click(object sender, RoutedEventArgs e) { isChorusEnabled = !isChorusEnabled; RefreshEffectParameters(); }
+        private void ToggleCompressorButton_Click(object sender, RoutedEventArgs e) { isCompressorEnabled = !isCompressorEnabled; RefreshEffectParameters(); }
 
-        private void EchoSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
-        {
-            if (echoProvider != null)
-            {
-                echoProvider.Feedback = (float)e.NewValue;
-            }
-        }
-
-        private void ReverbSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
-        {
-            if (reverbProvider != null)
-            {
-                reverbProvider.ReverbAmount = (float)e.NewValue;
-            }
-        }
+        // スライダー変更イベント
+        private void EchoSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e) => RefreshEffectParameters();
+        private void ReverbSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e) => RefreshEffectParameters();
+        private void TremoloDepthSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e) => RefreshEffectParameters();
+        private void ChorusSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e) => RefreshEffectParameters();
+        private void CompressorSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e) => RefreshEffectParameters();
 
         protected override void OnClosed(EventArgs e)
         {
             base.OnClosed(e);
             StopAudio();
         }
-    }
 
-    // エコー効果用シンプルプロバイダー
-    public class SimpleEchoProvider : ISampleProvider
-    {
-        private readonly ISampleProvider source;
-        private readonly float[] buffer;
-        private int bufferOffset;
-        private readonly int delaySamples;
-        private float decay;
+        // ==============================
+        // 各エフェクトクラス
+        // ==============================
 
-        public SimpleEchoProvider(ISampleProvider source, TimeSpan delay, float decay)
+        public class MultiTapEchoProvider : ISampleProvider
         {
-            this.source = source;
-            this.decay = decay;
-            WaveFormat = source.WaveFormat;
+            private readonly ISampleProvider source;
+            private readonly float[] buffer;
+            private int position;
+            private float feedback = 0.4f;
+            private float mix = 0f;
+            private bool enabled = false;
 
-            delaySamples = (int)(delay.TotalSeconds * WaveFormat.SampleRate) * WaveFormat.Channels;
-            buffer = new float[delaySamples];
-        }
-
-        public WaveFormat WaveFormat { get; }
-
-        public int Read(float[] outputBuffer, int offset, int count)
-        {
-            int read = source.Read(outputBuffer, offset, count);
-
-            for (int n = 0; n < read; n++)
+            public MultiTapEchoProvider(ISampleProvider source)
             {
-                float delayed = buffer[bufferOffset];
-                buffer[bufferOffset] = outputBuffer[offset + n] + delayed * decay;
-                outputBuffer[offset + n] += delayed;
-
-                bufferOffset++;
-                if (bufferOffset >= buffer.Length)
-                    bufferOffset = 0;
+                this.source = source;
+                WaveFormat = source.WaveFormat;
+                int delaySamples = (int)(0.35 * WaveFormat.SampleRate);
+                buffer = new float[delaySamples * WaveFormat.Channels];
             }
 
-            return read;
-        }
+            public WaveFormat WaveFormat { get; }
 
-        public float Feedback
-        {
-            get => decay;
-            set => decay = value;
-        }
-    }
-
-    // リバーブ効果用シンプルプロバイダー
-    public class SimpleReverbProvider : ISampleProvider
-    {
-        private readonly ISampleProvider source;
-        private readonly float[] delayBuffer;
-        private int delayOffset;
-        private float reverbLevel;
-
-        public SimpleReverbProvider(ISampleProvider source, TimeSpan delay, float reverbLevel)
-        {
-            this.source = source;
-            this.reverbLevel = reverbLevel;
-            WaveFormat = source.WaveFormat;
-
-            int delaySamples = (int)(delay.TotalSeconds * WaveFormat.SampleRate) * WaveFormat.Channels;
-            delayBuffer = new float[delaySamples];
-        }
-
-        public WaveFormat WaveFormat { get; }
-
-        public int Read(float[] buffer, int offset, int count)
-        {
-            int read = source.Read(buffer, offset, count);
-
-            for (int i = 0; i < read; i++)
+            public void UpdateParameters(bool enabled, float level)
             {
-                float delayed = delayBuffer[delayOffset];
-                delayBuffer[delayOffset] = buffer[offset + i] + delayed * reverbLevel;
-                buffer[offset + i] += delayed * 0.5f;
-
-                delayOffset++;
-                if (delayOffset >= delayBuffer.Length)
-                    delayOffset = 0;
+                this.enabled = enabled;
+                mix = enabled ? level * 0.4f : 0f;
             }
 
-            return read;
+            public int Read(float[] bufferOut, int offset, int count)
+            {
+                int read = source.Read(bufferOut, offset, count);
+                if (!enabled || mix <= 0.001f) return read;
+
+                for (int i = 0; i < read; i++)
+                {
+                    float input = bufferOut[offset + i];
+                    float delayed = buffer[position];
+                    bufferOut[offset + i] = input * (1 - mix) + delayed * mix;
+                    buffer[position] = input + delayed * feedback;
+                    position++;
+                    if (position >= buffer.Length) position = 0;
+                }
+                return read;
+            }
         }
 
-        public float ReverbAmount
+        public class HighQualityReverbProvider : ISampleProvider
         {
-            get => reverbLevel;
-            set => reverbLevel = value;
+            private readonly ISampleProvider source;
+            private readonly float[] buffer;
+            private int position;
+            private float wet = 0f;
+            private bool enabled = false;
+
+            public HighQualityReverbProvider(ISampleProvider source)
+            {
+                this.source = source;
+                WaveFormat = source.WaveFormat;
+                buffer = new float[(int)(0.3 * WaveFormat.SampleRate) * WaveFormat.Channels];
+            }
+
+            public WaveFormat WaveFormat { get; }
+
+            public void UpdateParameters(bool enabled, float level)
+            {
+                this.enabled = enabled;
+                wet = enabled ? 0.2f + level * 0.3f : 0f;
+            }
+
+            public int Read(float[] bufferOut, int offset, int count)
+            {
+                int read = source.Read(bufferOut, offset, count);
+                if (!enabled || wet <= 0.001f) return read;
+
+                for (int i = 0; i < read; i++)
+                {
+                    float input = bufferOut[offset + i];
+                    float delayed = buffer[position];
+                    bufferOut[offset + i] = input * (1 - wet) + delayed * wet;
+                    buffer[position] = input + delayed * 0.5f;
+                    position++;
+                    if (position >= buffer.Length) position = 0;
+                }
+                return read;
+            }
+        }
+
+        public class HighQualityTremoloProvider : ISampleProvider
+        {
+            private readonly ISampleProvider source;
+            private double rate = 4.0;
+            private float depth = 0f;
+            private bool enabled = false;
+            private int sample = 0;
+
+            public HighQualityTremoloProvider(ISampleProvider source)
+            {
+                this.source = source;
+                WaveFormat = source.WaveFormat;
+            }
+
+            public WaveFormat WaveFormat { get; }
+
+            public void UpdateParameters(bool enabled, float level)
+            {
+                this.enabled = enabled;
+                depth = enabled ? 0.3f + level * 0.4f : 0f;
+                rate = 2.0 + level * 4.0;
+            }
+
+            public int Read(float[] buffer, int offset, int count)
+            {
+                int read = source.Read(buffer, offset, count);
+                if (!enabled || depth <= 0.001f) return read;
+
+                double samplesPerCycle = WaveFormat.SampleRate / rate;
+                for (int n = 0; n < read; n++)
+                {
+                    double mod = 1 - (depth * 0.5 * (1 + Math.Sin(2 * Math.PI * sample / samplesPerCycle)));
+                    buffer[offset + n] *= (float)mod;
+                    sample++;
+                }
+                return read;
+            }
+        }
+
+        public class SimpleChorusProvider : ISampleProvider
+        {
+            private readonly ISampleProvider source;
+            private readonly float[] buffer;
+            private int position;
+            private bool enabled = false;
+            private float depth = 0f;
+            private int sampleCount;
+            private readonly float lfoRate = 0.25f;
+
+            public SimpleChorusProvider(ISampleProvider source)
+            {
+                this.source = source;
+                WaveFormat = source.WaveFormat;
+                buffer = new float[(int)(0.04 * WaveFormat.SampleRate) * WaveFormat.Channels];
+            }
+
+            public WaveFormat WaveFormat { get; }
+
+            public void UpdateParameters(bool enabled, float level)
+            {
+                this.enabled = enabled;
+                depth = enabled ? 0.02f + level * 0.04f : 0f;
+            }
+
+            public int Read(float[] buf, int offset, int count)
+            {
+                int read = source.Read(buf, offset, count);
+                if (!enabled || depth <= 0.001f) return read;
+
+                for (int n = 0; n < read; n++)
+                {
+                    float input = buf[offset + n];
+                    double lfo = (1 + Math.Sin(2 * Math.PI * lfoRate * sampleCount / WaveFormat.SampleRate)) / 2;
+                    int delay = (int)(lfo * depth * buffer.Length);
+                    int readPos = (position - delay + buffer.Length) % buffer.Length;
+                    float delayed = buffer[readPos];
+                    buf[offset + n] = input * 0.8f + delayed * 0.2f;
+                    buffer[position] = input;
+                    position = (position + 1) % buffer.Length;
+                    sampleCount++;
+                }
+                return read;
+            }
+        }
+
+        public class SimpleCompressorProvider : ISampleProvider
+        {
+            private readonly ISampleProvider source;
+            private float threshold = 1f;
+            private bool enabled = false;
+
+            public SimpleCompressorProvider(ISampleProvider source)
+            {
+                this.source = source;
+                WaveFormat = source.WaveFormat;
+            }
+
+            public WaveFormat WaveFormat { get; }
+
+            public void UpdateParameters(bool enabled, float level)
+            {
+                this.enabled = enabled;
+                threshold = enabled ? 0.5f + level * 0.4f : 1f;
+            }
+
+            public int Read(float[] buffer, int offset, int count)
+            {
+                int read = source.Read(buffer, offset, count);
+                if (!enabled || threshold >= 0.99f) return read;
+
+                for (int i = 0; i < read; i++)
+                {
+                    float s = buffer[offset + i];
+                    float a = Math.Abs(s);
+                    if (a > threshold)
+                        buffer[offset + i] = Math.Sign(s) * (threshold + (a - threshold) * 0.3f);
+                }
+                return read;
+            }
         }
     }
 }
