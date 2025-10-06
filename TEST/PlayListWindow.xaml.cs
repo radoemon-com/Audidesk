@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.Text.Json;
 using System.Windows;
 using Microsoft.Win32;
 using IniParser;
@@ -65,6 +66,50 @@ namespace Audidesk
                 }
             }
             catch (Exception ex)
+            {
+                MessageBox.Show("エラーが発生しました:\n" + ex.Message, "エラー", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+
+        private void CreatePlaylistButton_Click(object sender, RoutedEventArgs e)
+        {
+            var parser = new FileIniDataParser();
+            IniData data = parser.ReadFile(@"D:\Softwere\Audidesk\TEST\Conf.ini");
+
+            var alphanumeric = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+            var randomCode = new char[8];
+            var random = new Random();
+
+            string playListPath = data["Paths"]["playListPath"];
+            if (string.IsNullOrWhiteSpace(playListPath))
+            {
+                MessageBox.Show("INIファイルのplayListPathが無効です。", "エラー", MessageBoxButton.OK, MessageBoxImage.Error);
+                return;
+            }
+
+            playListPath = Path.GetFullPath(playListPath);
+            if (!Directory.Exists(playListPath))
+            {
+                Directory.CreateDirectory(playListPath);
+            }
+
+            for (int i = 0; i < randomCode.Length; i++) {
+                randomCode[i] = alphanumeric[random.Next(alphanumeric.Length)];
+            }
+
+            var fileName = new String(randomCode) + ".json";
+            Console.WriteLine();
+
+            try
+            {
+                // Jsonファイルの作成
+                using (System.IO.FileStream fs = System.IO.File.Create(playListPath + "\\" + fileName))
+                {
+                    Console.WriteLine("Creat File: " + playListPath + "\\" + fileName);
+
+                    
+                }
+            } catch (Exception ex)
             {
                 MessageBox.Show("エラーが発生しました:\n" + ex.Message, "エラー", MessageBoxButton.OK, MessageBoxImage.Error);
             }

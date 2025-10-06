@@ -8,6 +8,7 @@
         Title="PlayListWindow" Height="450" Width="800">
     <Grid>
         <Button Content="Import" Click="ImportButton_Click" Margin="10,10,690,386"/>
+        <Button Content="CreatePlaylist" Click="CreatePlaylistButton_Click" Margin="115,10,580,386"/>
         <TextBox x:Name="TEST" FontSize="16" Margin="10,53,10,10"/>
     </Grid>
 </Window>
