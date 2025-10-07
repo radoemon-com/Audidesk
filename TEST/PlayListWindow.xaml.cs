@@ -1,10 +1,10 @@
 using System;
 using System.IO;
-using System.Text.Json;
 using System.Windows;
 using Microsoft.Win32;
 using IniParser;
 using IniParser.Model;
+using Newtonsoft.Json;
 
 namespace Audidesk
 {
@@ -13,17 +13,16 @@ namespace Audidesk
         public PlayListWindow()
         {
             InitializeComponent();
+            SaveMusicList();
         }
 
         private void ImportButton_Click(object sender, RoutedEventArgs e)
         {
             try
             {
-                // INIファイルの読み込み
                 var parser = new FileIniDataParser();
                 IniData data = parser.ReadFile(@"D:\Softwere\Audidesk\TEST\Conf.ini");
 
-                // musicPathの取得と存在確認
                 string musicPath = data["Paths"]["musicPath"];
                 if (string.IsNullOrWhiteSpace(musicPath))
                 {
@@ -31,19 +30,16 @@ namespace Audidesk
                     return;
                 }
 
-                // 絶対パスに変換（必要に応じて）
                 musicPath = Path.GetFullPath(musicPath);
                 if (!Directory.Exists(musicPath))
                 {
-                    Directory.CreateDirectory(musicPath); // なければ作成
+                    Directory.CreateDirectory(musicPath);
                 }
 
-                // 現在のディレクトリをデバッグ出力
                 Console.WriteLine("Current Directory: " + musicPath);
 
                 TEST.Text = musicPath;
 
-                // ファイル選択ダイアログの表示
                 var dialog = new OpenFileDialog
                 {
                     Filter = "Audio Files (*.mp3;*.wav)|*.mp3;*.wav",
@@ -69,12 +65,16 @@ namespace Audidesk
             {
                 MessageBox.Show("エラーが発生しました:\n" + ex.Message, "エラー", MessageBoxButton.OK, MessageBoxImage.Error);
             }
+
+            SaveMusicList();
         }
 
         private void CreatePlaylistButton_Click(object sender, RoutedEventArgs e)
         {
             var parser = new FileIniDataParser();
             IniData data = parser.ReadFile(@"D:\Softwere\Audidesk\TEST\Conf.ini");
+
+            string playListName = PlayListNameTextBox.Text;
 
             var alphanumeric = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
             var randomCode = new char[8];
@@ -93,26 +93,80 @@ namespace Audidesk
                 Directory.CreateDirectory(playListPath);
             }
 
-            for (int i = 0; i < randomCode.Length; i++) {
+            for (int i = 0; i < randomCode.Length; i++)
+            {
                 randomCode[i] = alphanumeric[random.Next(alphanumeric.Length)];
             }
 
             var fileName = new String(randomCode) + ".json";
-            Console.WriteLine();
+            var fullPath = Path.Combine(playListPath, fileName);
 
             try
             {
-                // Jsonファイルの作成
-                using (System.IO.FileStream fs = System.IO.File.Create(playListPath + "\\" + fileName))
+                var playlist = new
                 {
-                    Console.WriteLine("Creat File: " + playListPath + "\\" + fileName);
+                    playList = new[]
+                    {
+                        new {
+                            name = $"{playListName}",
+                            music = new
+                            {}
+                        }
+                    }
+                };
 
-                    
-                }
-            } catch (Exception ex)
+                string jsonString = JsonConvert.SerializeObject(playlist, Formatting.Indented);
+
+                File.WriteAllText(fullPath, jsonString); // ← ここで内容を書き込む
+
+                Console.WriteLine("Create File: " + fullPath);
+                MessageBox.Show("プレイリストファイルを作成しました:\n" + fullPath, "完了", MessageBoxButton.OK, MessageBoxImage.Information);
+            }
+            catch (Exception ex)
             {
                 MessageBox.Show("エラーが発生しました:\n" + ex.Message, "エラー", MessageBoxButton.OK, MessageBoxImage.Error);
             }
+        }
+
+        private void SaveMusicList()
+        {
+            var parser = new FileIniDataParser();
+            IniData data = parser.ReadFile(@"D:\Softwere\Audidesk\TEST\Conf.ini");
+            string musicListPath = @"D:\Softwere\Audidesk\TEST\TEST_PlayList\musicList.json";
+
+            string musicPath = data["Paths"]["musicPath"];
+            musicPath = Path.GetFullPath(musicPath);
+            if (!Directory.Exists(musicPath))
+            {
+                Directory.CreateDirectory(musicPath);
+            }
+
+            var files = Directory.GetFiles(musicPath, "*.*")
+                .Where(f => f.EndsWith(".mp3", StringComparison.OrdinalIgnoreCase) || f.EndsWith(".wav", StringComparison.OrdinalIgnoreCase))
+                .ToArray();
+
+            var musicDict = new Dictionary<string, object>();
+            for (int i = 0; i < files.Length; i++)
+            {
+                string fileName = Path.GetFileName(files[i]);
+                musicDict[i.ToString()] = new
+                {
+                    filePath = $"{musicPath}\\{fileName}",
+                    title = Path.GetFileNameWithoutExtension(fileName),
+                };
+            }
+
+            var musicList = new
+            {
+                musicList = new
+                {
+                    name = "musicList",
+                    music = musicDict
+                }
+            };
+
+            string json = JsonConvert.SerializeObject(musicList, Formatting.Indented);
+            File.WriteAllText(musicListPath, json);
         }
     }
 }

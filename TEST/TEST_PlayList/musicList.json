@@ -1,0 +1,15 @@
+{
+  "musicList": {
+    "name": "musicList",
+    "music": {
+      "0": {
+        "filePath": "D:\\Softwere\\Audidesk\\TEST\\Music\\DENONBU - PLAY,PAUSE.mp3",
+        "title": "DENONBU - PLAY,PAUSE"
+      },
+      "1": {
+        "filePath": "D:\\Softwere\\Audidesk\\TEST\\Music\\KizunaAI「かもね」.mp3",
+        "title": "KizunaAI「かもね」"
+      }
+    }
+  }
+}
