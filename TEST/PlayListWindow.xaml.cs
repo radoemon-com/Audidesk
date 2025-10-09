@@ -13,6 +13,7 @@ namespace Audidesk
         public PlayListWindow()
         {
             InitializeComponent();
+            LoadConfig();
             SaveMusicList();
         }
 
@@ -67,6 +68,26 @@ namespace Audidesk
             }
 
             SaveMusicList();
+        }
+
+        public static void LoadConfig()
+        {
+            try
+            {
+                var parser = new FileIniDataParser();
+                string configPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Conf.ini");
+
+                Console.WriteLine("Config loaded from: " + configPath);
+
+                IniData data = parser.ReadFile(configPath);
+
+                // データを使って設定を適用する処理をここに追加
+                MessageBox.Show($"{configPath}");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine("設定ファイルの読み込みに失敗しました: " + ex.Message);
+            }
         }
 
         private void CreatePlaylistButton_Click(object sender, RoutedEventArgs e)
